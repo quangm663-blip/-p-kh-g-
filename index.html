@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Đập Khô Gà PRO MAX</title>
+
+<style>
+body{
+    margin:0;
+    text-align:center;
+    font-family:Arial;
+    color:white;
+    background:url("assets/bg.jpg") center/cover no-repeat;
+    cursor:none;
+    overflow:hidden;
+}
+
+/* RUNG MÀN */
+.shake{
+    animation:shake 0.2s;
+}
+@keyframes shake{
+    0%{transform:translate(2px,2px)}
+    25%{transform:translate(-2px,-3px)}
+    50%{transform:translate(3px,-2px)}
+    75%{transform:translate(-3px,2px)}
+    100%{transform:translate(2px,-2px)}
+}
+
+#score{font-size:24px}
+#lives{font-size:24px}
+
+#comboText{
+    font-size:28px;
+    color:yellow;
+    height:40px;
+}
+
+/* GRID */
+#game{
+    display:grid;
+    grid-template-columns:repeat(3,130px);
+    gap:15px;
+    justify-content:center;
+    margin-top:20px;
+}
+
+.hole{
+    width:130px;
+    height:130px;
+    background:rgba(0,0,0,0.5);
+    border-radius:15px;
+    position:relative;
+    overflow:hidden;
+}
+
+/* CHUỘT */
+.mole{
+    width:100px;
+    position:absolute;
+    bottom:-120px;
+    left:15px;
+    transition:0.15s;
+}
+
+.active .mole{
+    bottom:10px;
+    transform:scale(1.05);
+}
+
+/* BÚA */
+#hammer{
+    position:fixed;
+    width:90px;
+    pointer-events:none;
+    transform:translate(-50%,-50%);
+}
+.hit{
+    transform:translate(-50%,-50%) rotate(-25deg) scale(0.9);
+}
+
+/* GAME OVER */
+#gameOver{
+    position:fixed;
+    inset:0;
+    display:none;
+    justify-content:center;
+    align-items:center;
+    background:rgba(0,0,0,0.8);
+}
+#comboUI{
+    height:80px;
+    margin-top:5px;
+}
+
+#comboUI img{
+    height:70px;
+    transition:0.2s;
+}
+
+.comboPop{
+    transform:scale(1.25);
+    filter:drop-shadow(0 0 10px yellow);
+}
+</style>
+</head>
+
+<body>
+
+<h1>🔥 Đập KHÔ GÀ PRO MAX 🔥</h1>
+<div id="score">Điểm: 0</div>
+<div id="lives"></div>
+<div id="comboText"></div>
+<div id="comboUI">
+    <img id="comboImg" src="">
+</div>
+<button onclick="startGame()">Start</button>
+
+<div id="game"></div>
+
+<img id="hammer" src="assets/hammer.png">
+
+<div id="gameOver">
+    <div>
+        <h2 id="finalScore"></h2>
+        <button onclick="startGame()">Chơi lại</button>
+    </div>
+</div>
+
+<audio id="bgm" src="assets/bgm.mp3" loop></audio>
+<audio id="hitSound" src="assets/hit.mp3"></audio>
+
+<script>
+const game = document.getElementById("game");
+const scoreBoard = document.getElementById("score");
+const livesUI = document.getElementById("lives");
+const comboText = document.getElementById("comboText");
+const comboImg = document.getElementById("comboImg");
+const hammer = document.getElementById("hammer");
+
+const bgm = document.getElementById("bgm");
+const hitSound = document.getElementById("hitSound");
+
+let holes=[];
+let score=0;
+let combo=0;
+let lives=6;
+let speed=800;
+let speedLevel=0;
+let gameRunning=false;
+let spawnLoop;
+let lastHole=null;
+
+/* TẠO LỖ */
+for(let i=0;i<6;i++){
+    let hole=document.createElement("div");
+    hole.classList.add("hole");
+
+    let mole=document.createElement("img");
+    mole.src="assets/mole.png";
+    mole.classList.add("mole");
+
+    hole.appendChild(mole);
+    game.appendChild(hole);
+    holes.push(hole);
+
+    hole.onclick=()=>hit(hole);
+}
+
+/* UI */
+function updateLives(){
+    livesUI.textContent="❤️".repeat(lives);
+}
+
+function updateCombo(){
+    if(combo<3) comboText.textContent="";
+    else comboText.textContent="COMBO x"+combo+" 🔥";
+}
+function updateCombo(){
+
+    if(combo <= 3){
+        comboImg.src = "";
+        return;
+    }
+
+    if(combo <= 8){
+        comboImg.src = "assets/combo1.png";
+    }
+    else if(combo <= 15){
+        comboImg.src = "assets/combo2.png";
+    }
+    else{
+        comboImg.src = "assets/combo3.png";
+    }
+
+    // hiệu ứng pop
+    comboImg.classList.add("comboPop");
+    setTimeout(()=>comboImg.classList.remove("comboPop"),150);
+}
+
+/* SPAWN */
+function spawnMole(){
+
+    // MISS → mất tim + reset combo
+    if(lastHole && lastHole.classList.contains("active")){
+        lives--;
+        combo=0;
+        updateLives();
+            comboImg.src = "";
+        updateCombo();
+
+        if(lives<=0){
+            endGame();
+            return;
+        }
+    }
+
+    holes.forEach(h=>h.classList.remove("active"));
+
+    let index;
+    do{
+        index=Math.floor(Math.random()*holes.length);
+    }while(holes[index]===lastHole);
+
+    holes[index].classList.add("active");
+    lastHole=holes[index];
+}
+
+/* START */
+function startGame(){
+    score=0;
+    combo=0;
+    lives=6;
+    speed=800;
+    speedLevel=0;
+    gameRunning=true;
+
+    scoreBoard.textContent="Điểm: 0";
+    updateLives();
+    updateCombo();
+
+    bgm.currentTime=0;
+    bgm.play();
+
+    clearInterval(spawnLoop);
+    spawnLoop=setInterval(spawnMole,speed);
+
+    document.getElementById("gameOver").style.display="none";
+}
+
+/* HIT */
+function hit(hole){
+    if(!gameRunning) return;
+
+    if(hole.classList.contains("active")){
+
+        combo++;
+
+        // CRITICAL HIT
+        let crit = Math.random()<0.2 ? 2 : 1;
+        score += combo * crit;
+
+        scoreBoard.textContent="Điểm: "+score;
+
+        // TĂNG TỐC THEO ĐIỂM
+        let newLevel=Math.floor(score/100);
+        if(newLevel>speedLevel){
+            speedLevel=newLevel;
+            if(speed>200) speed*=0.85;
+
+            clearInterval(spawnLoop);
+            spawnLoop=setInterval(spawnMole,speed);
+        }
+
+        hitSound.currentTime=0;
+        hitSound.play();
+
+        updateCombo();
+        hole.classList.remove("active");
+
+        // RUNG
+        document.body.classList.add("shake");
+        setTimeout(()=>document.body.classList.remove("shake"),150);
+
+    }else{
+        lives--;
+        combo=0;
+        updateLives();
+        comboImg.src = "";
+        updateCombo();
+
+        if(lives<=0) endGame();
+    }
+
+    hammer.classList.add("hit");
+    setTimeout(()=>hammer.classList.remove("hit"),100);
+}
+
+/* GAME OVER */
+function endGame(){
+    gameRunning=false;
+    clearInterval(spawnLoop);
+    bgm.pause();
+
+    document.getElementById("finalScore").textContent="Điểm: "+score;
+    document.getElementById("gameOver").style.display="flex";
+}
+
+/* BÚA */
+document.addEventListener("mousemove",e=>{
+    hammer.style.left=e.pageX+"px";
+    hammer.style.top=e.pageY+"px";
+});
+
+document.addEventListener("click",()=>{
+    hammer.classList.add("hit");
+    setTimeout(()=>hammer.classList.remove("hit"),100);
+});
+</script>
+
+</body>
+</html>
